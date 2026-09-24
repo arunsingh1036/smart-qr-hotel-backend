@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Live KOT - Test</title>
+    <!-- Socket.io client CDN -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; padding: 20px; }
+        .order-box { background: white; padding: 15px; margin-bottom: 10px; border-left: 5px solid #ff4757; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { color: #2f3640; }
+    </style>
+</head>
+<body>
+    <h2>🔔 Live Kitchen KOT Dashboard (Hotel: taj-hotel-01)</h2>
+    <div id="orders-container">
+        <p>Waiting for new orders... ⏳</p>
+    </div>
+
+    <script>
+        // Backend server se connect karein
+        const socket = io("http://localhost:5000");
+
+        socket.on("connect", () => {
+            console.log("Connected to WebSocket server! ID:", socket.id);
+        });
+
+        // 'taj-hotel-01' ke liye naye order ka event listen karein
+        socket.on("newOrder_taj-hotel-01", (data) => {
+            console.log("New Order Received:", data);
+            
+            const container = document.getElementById("orders-container");
+            // Agar pehla order hai toh "Waiting..." text hata dein
+            if(container.innerHTML.includes("Waiting for new orders...")) {
+                container.innerHTML = "";
+            }
+
+            const orderDiv = document.createElement("div");
+            orderDiv.className = "order-box";
+            orderDiv.innerHTML = `
+                <h3>Table No: ${data.order.tableNo} (Customer: ${data.order.customerName})</h3>
+                <p><b>Status:</b> ${data.order.status}</p>
+                <p><b>Total Amount:</b> ₹${data.order.totalAmount}</p>
+                <p><b>Items:</b></p>
+                <ul>
+                    ${data.order.items.map(item => `<li>${item.name} x${item.quantity}</li>`).join('')}
+                </ul>
+            `;
+            container.prepend(orderDiv); // Naya order sabse upar dikhega
+        });
+    </script>
+</body>
+</html>
