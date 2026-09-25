@@ -167,10 +167,55 @@ router.put("/pay/:tableNo", verifyToken, async (req, res) => {
     res.status(200).json({
       message: `Bill for table ${tableNo} marked as Paid and closed successfully! 💰`,
     });
+
+
   } catch (error) {
     res.status(500).json({
       message: "Error closing bill",
       error: error.message,
+    });
+    // GET HOTEL TRANSACTIONS & ANALYTICS (Super Admin only)
+    router.get("/hotel-stats/:hotelId", verifyToken, verifySuperAdmin, async (req, res) => {
+      try {
+        const { hotelId } = req.params;
+
+        // Import Order model (ensure you require it at the top of your file)
+        const Order = require("../models/Order");
+
+        // 1. Get Daily Transactions (Group by Date)
+        const dailyStats = await Order.aggregate([
+          { $match: { hotelId: hotelId } },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              totalSales: { $sum: "$totalAmount" }, // Assuming 'totalAmount' stores the order price
+              totalOrders: { $sum: 1 }
+            }
+          },
+          { $sort: { _id: -1 } } // Latest date first
+        ]);
+
+        // 2. Get Monthly Transactions (Group by Year-Month)
+        const monthlyStats = await Order.aggregate([
+          { $match: { hotelId: hotelId } },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+              totalSales: { $sum: "$totalAmount" },
+              totalOrders: { $sum: 1 }
+            }
+          },
+          { $sort: { _id: -1 } } // Latest month first
+        ]);
+
+        res.status(200).json({
+          hotelId,
+          dailyStats,
+          monthlyStats
+        });
+      } catch (error) {
+        res.status(500).json({ message: "Error fetching hotel stats", error: error.message });
+      }
     });
   }
 });
