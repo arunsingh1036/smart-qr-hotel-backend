@@ -140,6 +140,26 @@ router.get("/bill/:tableNo", verifyToken, async (req, res) => {
   }
 });
 
+// GET ACTIVE ORDERS FOR A SPECIFIC TABLE
+router.get("/table-orders/:hotelId/:tableNo", async (req, res) => {
+  try {
+    const { hotelId, tableNo } = req.params;
+
+    const orders = await Order.find({
+      hotelId: decodeURIComponent(hotelId),
+      tableNo: tableNo,
+      status: { $ne: "Paid" } // Sirf un-paid active orders dikhane ke liye
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json(orders);
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching table orders",
+      error: error.message,
+    });
+  }
+});
+
 // 5. CLOSE BILL / MARK AS PAID API
 router.put("/pay/:tableNo", verifyToken, async (req, res) => {
   try {
