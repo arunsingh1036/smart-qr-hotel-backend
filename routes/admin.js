@@ -111,6 +111,33 @@ router.get("/hotel-stats/:hotelId", verifyToken, verifySuperAdmin, async (req, r
   }
 });
 
+// RESET HOTEL ADMIN PASSWORD BY SUPER ADMIN
+router.put("/reset-password/:userId", verifyToken, verifySuperAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long!" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!updatedUser) return res.status(404).json({ message: "Hotel Admin not found!" });
+
+    res.status(200).json({ message: "Password reset successfully by Super Admin! 🟢" });
+  } catch (error) {
+    res.status(500).json({ message: "Error resetting password", error: error.message });
+  }
+});
+
 // GENERATE TABLE QR LINK API (Protected: Hotel Admin can generate ordering links for tables)
 router.get("/qr-link/:tableNo", verifyToken, async (req, res) => {
   try {
