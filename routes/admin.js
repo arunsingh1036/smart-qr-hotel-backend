@@ -64,6 +64,16 @@ router.delete("/user/:userId", verifyToken, verifySuperAdmin, async (req, res) =
     res.status(500).json({ message: "Error deleting user", error: error.message });
   }
 });
+// GET ALL HOTEL ADMINS (Super Admin only)
+router.get("/all-hotels", verifyToken, verifySuperAdmin, async (req, res) => {
+  try {
+    // Sirf 'hotel_admin' role wale users ko fetch karna
+    const hotels = await User.find({ role: "hotel_admin" }).select("-password");
+    res.status(200).json(hotels);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching hotels list", error: error.message });
+  }
+});
 // GENERATE TABLE QR LINK API (Protected: Hotel Admin can generate ordering links for tables)
 router.get("/qr-link/:tableNo", verifyToken, async (req, res) => {
   try {
