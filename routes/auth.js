@@ -5,38 +5,37 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const verifyToken = require("../middleware/authMiddleware");
 
+// Middleware to check if logged-in user is Super Admin
+const verifySuperAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "super_admin") {
+    next();
+  } else {
+    res.status(403).json({ message: "Access Denied! Super Admin only." });
+  }
+};
+
 // 1. TOGGLE ORDERS OPEN/CLOSED
 router.put("/toggle-orders", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
 
     if (!user) {
-      return res.status(404).json({
-        message: "User not found!",
-      });
+      return res.status(404).json({ message: "User not found!" });
     }
 
     if (user.role !== "hotel_admin") {
-      return res.status(403).json({
-        message: "Only hotel admin can open or close orders!",
-      });
+      return res.status(403).json({ message: "Only hotel admin can open or close orders!" });
     }
 
     user.isAcceptingOrders = !user.isAcceptingOrders;
-
     await user.save();
 
     res.status(200).json({
-      message: `Orders are now ${
-        user.isAcceptingOrders ? "OPEN 🟢" : "CLOSED 🔴"
-      }`,
+      message: `Orders are now ${user.isAcceptingOrders ? "OPEN 🟢" : "CLOSED 🔴"}`,
       isAcceptingOrders: user.isAcceptingOrders,
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Error updating order status",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Error updating order status", error: error.message });
   }
 });
 
@@ -46,17 +45,12 @@ router.post("/register", async (req, res) => {
     const { name, email, password, hotelId } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({
-        message: "Name, email and password are required!",
-      });
+      return res.status(400).json({ message: "Name, email and password are required!" });
     }
 
     const existingUser = await User.findOne({ email });
-
     if (existingUser) {
-      return res.status(400).json({
-        message: "User with this email already exists!",
-      });
+      return res.status(400).json({ message: "User with this email already exists!" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -75,18 +69,63 @@ router.post("/register", async (req, res) => {
     await newUser.save();
 
     res.status(201).json({
-      message:
-        "Registration successful! Your account is pending approval from Super Admin. 🟢",
+      message: "Registration successful! Your account is pending approval from Super Admin. 🟢",
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Server error during registration",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Server error during registration", error: error.message });
   }
 });
 
-// RESET HOTEL ADMIN PASSWORD BY SUPER ADMIN
+// 3. LOGIN API
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid email or password!" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid email or password!" });
+    }
+
+    if (user.role !== "super_admin" && !user.isApproved) {
+      return res.status(403).json({ message: "Your account is pending approval from Super Admin!" });
+    }
+
+    if (user.accountStatus === "banned") {
+      return res.status(403).json({ message: "Your account has been banned by Super Admin!" });
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        role: user.role,
+        hotelId: user.hotelId,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.status(200).json({
+      message: "Login successful! 🚀",
+      token,
+      user: {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        hotelId: user.hotelId,
+        isAcceptingOrders: user.isAcceptingOrders,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error during login", error: error.message });
+  }
+});
+
+// 4. RESET HOTEL ADMIN PASSWORD BY SUPER ADMIN
 router.put("/reset-password/:userId", verifyToken, verifySuperAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -113,69 +152,29 @@ router.put("/reset-password/:userId", verifyToken, verifySuperAdmin, async (req,
   }
 });
 
-// 3. LOGIN API
-router.post("/login", async (req, res) => {
+// 5. FORGOT PASSWORD API (Hotel Admin can reset their own password)
+router.post("/forgot-password", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: "Email and new password (min 6 chars) are required!" });
+    }
 
     const user = await User.findOne({ email });
-
     if (!user) {
-      return res.status(400).json({
-        message: "Invalid email or password!",
-      });
+      return res.status(404).json({ message: "User with this email does not exist!" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid email or password!",
-      });
-    }
+    user.password = hashedPassword;
+    await user.save();
 
-    if (user.role !== "super_admin" && !user.isApproved) {
-      return res.status(403).json({
-        message:
-          "Your account is pending approval from Super Admin!",
-      });
-    }
-
-    if (user.accountStatus === "banned") {
-      return res.status(403).json({
-        message:
-          "Your account has been banned by Super Admin!",
-      });
-    }
-
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        role: user.role,
-        hotelId: user.hotelId,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1d",
-      }
-    );
-
-    res.status(200).json({
-      message: "Login successful! 🚀",
-      token,
-      user: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        hotelId: user.hotelId,
-        isAcceptingOrders: user.isAcceptingOrders,
-      },
-    });
+    res.status(200).json({ message: "Password updated successfully! You can now login. 🚀" });
   } catch (error) {
-    res.status(500).json({
-      message: "Server error during login",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Server error during password reset", error: error.message });
   }
 });
 
