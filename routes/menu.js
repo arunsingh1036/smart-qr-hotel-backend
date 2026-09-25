@@ -60,4 +60,32 @@ router.delete("/delete/:itemId", verifyToken, async (req, res) => {
   }
 });
 
+// 4. UPDATE MENU ITEM API (Protected: Only Hotel Admin can update dishes)
+router.put("/update/:itemId", verifyToken, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { name, description, price, category, image } = req.body;
+
+    const updatedItem = await MenuItem.findByIdAndUpdate(
+      itemId,
+      { name, description, price, category, image },
+      { new: true }
+    );
+
+    if (!updatedItem) {
+      return res.status(404).json({ message: "Menu item not found!" });
+    }
+
+    res.status(200).json({ 
+      message: "Menu item updated successfully! ✏️", 
+      updatedItem 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: "Error updating menu item", 
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;

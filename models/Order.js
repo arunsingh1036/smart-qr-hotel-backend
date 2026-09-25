@@ -2,6 +2,7 @@
 const mongoose = require("mongoose");
 
 // 2. Define the Order Schema
+
 const orderSchema = new mongoose.Schema(
   {
     hotelId: {
