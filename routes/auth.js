@@ -89,7 +89,8 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// 3. LOGIN API
+
+// 3. LOGIN API (auth.js)
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -112,6 +113,12 @@ router.post("/login", async (req, res) => {
       return res.status(403).json({ message: "Your account has been banned by Super Admin!" });
     }
 
+    // 👈 Agar user ke paas totalTables pehle se nahi hai, toh default 5 ya 10 set karke save kar dein
+    if (!user.totalTables) {
+      user.totalTables = 5;
+      await user.save();
+    }
+
     const token = jwt.sign(
       {
         userId: user._id,
@@ -122,24 +129,18 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
-   
-
     res.status(200).json({
-  message: "Login successful! 🚀",
-  token,
-  user: {
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    hotelId: user.hotelId,
-    isAcceptingOrders: user.isAcceptingOrders,
-    totalTables: user.totalTables || 5, // 👈 Yeh line add karni hai
-  },
-});
-
-
-
-
+      message: "Login successful! 🚀",
+      token,
+      user: {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        hotelId: user.hotelId,
+        isAcceptingOrders: user.isAcceptingOrders,
+        totalTables: user.totalTables, // 👈 Ab ye hamesha sahi value bhejega
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error during login", error: error.message });
   }

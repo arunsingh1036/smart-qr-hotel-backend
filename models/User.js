@@ -38,7 +38,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    totalTables: { type: Number, default: 10 },
+
+    totalTables: {
+      type: Number,
+      default: 5, // Agar koi set na kare toh default 5 rahegi
+    },
 
     accountStatus: {
       type: String,
