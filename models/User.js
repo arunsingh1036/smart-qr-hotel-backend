@@ -38,6 +38,7 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    totalTables: { type: Number, default: 10 },
 
     accountStatus: {
       type: String,

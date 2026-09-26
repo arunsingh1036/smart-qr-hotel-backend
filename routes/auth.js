@@ -44,13 +44,26 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password, hotelId } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Name, email and password are required!" });
+    // 1. Check if all fields including hotelId are provided
+    if (!name || !email || !password || !hotelId) {
+      return res.status(400).json({ message: "Name, email, password and Hotel ID are all required!" });
     }
 
+    // 2. Clean and standardize hotelId (lowercase and trim spaces)
+    const formattedHotelId = hotelId.trim().toLowerCase();
+
+    // 3. Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User with this email already exists!" });
+    }
+
+    // 4. NEW: Check if hotelId is already taken by another hotel
+    const existingHotel = await User.findOne({ hotelId: formattedHotelId });
+    if (existingHotel) {
+      return res.status(400).json({
+        message: `Hotel ID '${hotelId}' is already registered! Please choose a unique Hotel ID.`
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -61,7 +74,7 @@ router.post("/register", async (req, res) => {
       email,
       password: hashedPassword,
       role: "hotel_admin",
-      hotelId: hotelId || null,
+      hotelId: formattedHotelId, // Saved as unique standardized string
       isApproved: false,
       isAcceptingOrders: true,
     });
@@ -109,17 +122,24 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
+   
+
     res.status(200).json({
-      message: "Login successful! 🚀",
-      token,
-      user: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        hotelId: user.hotelId,
-        isAcceptingOrders: user.isAcceptingOrders,
-      },
-    });
+  message: "Login successful! 🚀",
+  token,
+  user: {
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    hotelId: user.hotelId,
+    isAcceptingOrders: user.isAcceptingOrders,
+    totalTables: user.totalTables || 5, // 👈 Yeh line add karni hai
+  },
+});
+
+
+
+
   } catch (error) {
     res.status(500).json({ message: "Server error during login", error: error.message });
   }
@@ -175,6 +195,34 @@ router.post("/forgot-password", async (req, res) => {
     res.status(200).json({ message: "Password updated successfully! You can now login. 🚀" });
   } catch (error) {
     res.status(500).json({ message: "Server error during password reset", error: error.message });
+  }
+});
+
+// 6. UPDATE HOTEL TABLES COUNT API
+router.put("/update-tables", verifyToken, async (req, res) => {
+  try {
+    const { totalTables } = req.body;
+
+    if (!totalTables || totalTables < 1) {
+      return res.status(400).json({ message: "Invalid table count!" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.userId,
+      { totalTables },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "Hotel Admin not found!" });
+    }
+
+    res.status(200).json({
+      message: "Total tables updated successfully! 🟢",
+      totalTables: updatedUser.totalTables,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating tables", error: error.message });
   }
 });
 

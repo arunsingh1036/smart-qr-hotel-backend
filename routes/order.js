@@ -78,16 +78,18 @@ router.put("/status/:orderId", verifyToken, async (req, res) => {
   try {
     const { status } = req.body;
     const { orderId } = req.params;
+    const { hotelId } = req.user; // 👈 Token se hotelId nikal liya
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      orderId,
+    // 👈 Yeh check ensure karega ki order sirf usi hotel ka ho jo login hai
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: orderId, hotelId }, 
       { status },
       { new: true }
     );
 
     if (!updatedOrder) {
       return res.status(404).json({
-        message: "Order not found!",
+        message: "Order not found or unauthorized!",
       });
     }
 
@@ -102,7 +104,6 @@ router.put("/status/:orderId", verifyToken, async (req, res) => {
     });
   }
 });
-
 // 4. GENERATE BILL API
 router.get("/bill/:tableNo", verifyToken, async (req, res) => {
   try {
